@@ -1,13 +1,17 @@
+// src/components/Login.js
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Import useNavigate for redirection
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Login = () => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
-  const [error, setError] = useState(''); // State for managing error messages
-  const navigate = useNavigate(); // Hook for navigation
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -15,8 +19,8 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Login attempt with:', formData);
-    setError(''); // Reset error message before submitting
+    setError('');
+    setIsLoading(true);
 
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
@@ -24,21 +28,21 @@ const Login = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
       if (response.ok) {
-        console.log('Login successful:', data.message);
-        // Redirect to logged-in page
-        navigate('/dashboard'); // Change this to your desired route
+        login(data.user);
+        navigate('/dashboard');
       } else {
-        setError(data.message); // Set error message from the response
-        console.error('Login failed:', data.message);
+        setError(data.message || 'Invalid email or password.');
       }
     } catch (error) {
-      console.error('Error logging in:', error);
-      setError('An unexpected error occurred. Please try again.'); // Set a generic error message
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -46,39 +50,40 @@ const Login = () => {
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
         <h2 className="text-2xl font-bold text-center mb-6">Log In</h2>
-        {error && <p className="text-red-500 text-center mb-4">{error}</p>} {/* Display error message */}
+        {error && <p className="text-red-500 text-center mb-4">{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <input 
-              name="email" 
+            <input
+              name="email"
               type="email"
-              value={formData.email} 
-              onChange={handleChange} 
-              placeholder="Email" 
-              className="w-full p-2 border rounded" 
-              required 
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Email"
+              className="w-full p-2 border rounded"
+              required
             />
           </div>
           <div className="mb-6">
-            <input 
-              name="password" 
-              type="password" 
-              value={formData.password} 
-              onChange={handleChange} 
-              placeholder="Password" 
-              className="w-full p-2 border rounded" 
-              required 
+            <input
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Password"
+              className="w-full p-2 border rounded"
+              required
             />
           </div>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition"
+            disabled={isLoading}
           >
-            Log In
+            {isLoading ? 'Logging In...' : 'Log In'}
           </button>
         </form>
         <p className="mt-4 text-center">
-          New user? <a href="/signup" className="text-blue-500 hover:underline">Sign Up</a>
+          New user? <Link to="/login" className="text-blue-500 hover:underline">Sign Up</Link>
         </p>
       </div>
     </div>
@@ -86,4 +91,3 @@ const Login = () => {
 };
 
 export default Login;
-

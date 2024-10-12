@@ -2,7 +2,6 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-
 // Signup
 export const signup = async (req, res) => {
   const { name, email, password } = req.body;
@@ -14,18 +13,22 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
     // Create new user
-    const user = new User({ name, email, password: hashedPassword });
+    const user = new User({ name, email, password });
     await user.save();
 
     // Create JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    console.log(token)
 
     // Set token in cookie
-    res.cookie('token', token, { httpOnly: true });
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 3600000 // Cookie expiry: 1 hour
+    });
+    req.userId=email;
 
     res.status(201).json({ message: 'User created successfully', token });
   } catch (error) {
@@ -34,7 +37,6 @@ export const signup = async (req, res) => {
 };
 
 // Login
-
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -55,10 +57,10 @@ export const login = async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // Set token in cookie
-    res.cookie('token', token, { 
+    res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-      sameSite: 'strict', // Prevent CSRF attacks
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 3600000 // Cookie expiry: 1 hour
     });
 
@@ -69,7 +71,7 @@ export const login = async (req, res) => {
       email: user.email
     };
 
-    res.status(200).json({ message: 'Login successful', user: userResponse, token });
+    res.status(200).json({ message: 'Login successful', user:token });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Error logging in user', error: error.message });

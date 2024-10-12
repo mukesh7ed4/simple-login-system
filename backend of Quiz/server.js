@@ -1,28 +1,40 @@
+// server.js
 import express from 'express';
 import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
-import cors from 'cors'; // Add this import for CORS
-import authRoutes from './routes/auth.js'; // Import your auth routes
+import cors from 'cors';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import otpGenerator from 'otp-generator';
-dotenv.config(); // Load environment variables
+
+import authRoutes from './routes/auth.js';
+import chatRoutes from './routes/chat.js';
+import friendRoutes from './routes/FriendRoute.js';
+import errorHandler from './middleware/errorMiddleware.js';
+import { protect } from './middleware/authMiddleware.js';
+import { handleSocketConnection } from './socket/socketHandler.js';
+
+dotenv.config();
 
 const app = express();
-app.use(express.json()); // Enable JSON parsing
-app.use(cookieParser()); // Enable cookie parsing
+app.use(express.json());
+const httpServer = createServer(app);
 
-// Configure CORS
-const corsOptions = {
-  origin: 'http://localhost:5173', // This should match your frontend origin
-  credentials: true,  // Allow credentials (cookies, authorization headers, etc.)
-};
+// Middleware configuration
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 
-app.use(cors(corsOptions)); // Apply CORS middleware
+app.use((req, res, next) => {
+  console.log(`Request method: ${req.method}, Request URL: ${req.url}`);
+  next();
+});
 
-// Generate OTP
-export const generateOTP = () => {
-  return otpGenerator.generate(6, { upperCase: false, specialChars: false, alphabets: false });
-};
+
+app.use(cookieParser());
+app.use(express.json());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -32,12 +44,33 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => console.log('MongoDB connected'))
   .catch((error) => console.error('Error connecting to MongoDB:', error));
 
-// Use authentication routes
+// Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/chat', protect, chatRoutes);
+app.use('/api/friends', friendRoutes);
 
+// Protected route example
+app.get('/api/profile', protect, (req, res) => {
+  res.json({ user: req.user });
+});
 
-// Start server
+// Socket.IO setup
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+handleSocketConnection(io);
+
+// Error handling middleware
+app.use(errorHandler);
+
+// Start the server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
